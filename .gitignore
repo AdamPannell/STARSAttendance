@@ -28,6 +28,11 @@ local.properties
 # PDT-specific
 .buildpath
 
+#################
+## Test Files
+#################
+
+STARS Attendance File *.txt
 
 #################
 ## Visual Studio

@@ -6,6 +6,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <regex>
 
 #define MAX_LOADSTRING 100
 
@@ -31,7 +32,7 @@ std::ifstream fin;								//Create file reader object
 
 // Forward declarations of functions included in this code module:
 ATOM				MyRegisterClass(HINSTANCE hInstance);
-BOOL				InitInstance(HINSTANCE, int);
+HWND				InitInstance(HINSTANCE, int);
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 void				createSecondPage(HWND);
@@ -42,6 +43,8 @@ wchar_t*			ansiToUni(std::string);				//Converts string objects to uncode c-stri
 void				instructMe();
 std::string			wordToString(WORD);
 std::string			getDate();
+bool				validateIDNumber(std::string);
+void				idError();
 
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -67,7 +70,8 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	MyRegisterClass(hInstance);        //define line 67
 
 	// Perform application initialization:
-	if (!InitInstance (hInstance, nCmdShow))
+	HWND hWnd = InitInstance (hInstance, nCmdShow);
+	if(!hWnd) //Check if window was sussesfully created
 	{
 		return FALSE;
 	}
@@ -79,8 +83,11 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	{
 		if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
 		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
+			if(!IsDialogMessage(hWnd, &msg))
+			{
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+			}
 		}
 	}
 
@@ -123,7 +130,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)  //Used line 37
 //        In this function, we save the instance handle in a global variable and
 //        create and display the main program window.
 //
-BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
+HWND InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    HWND hWnd;
 
@@ -132,15 +139,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPED | WS_CAPTION /*| WS_SYSMENU */| WS_THICKFRAME /*| WS_MINIMIZEBOX | WS_MAXIMIZEBOX*/,
       CW_USEDEFAULT, 0, 400, 370, NULL, NULL, hInstance, NULL);
 
-   if (!hWnd)
-   {
-      return FALSE;
-   }
-
    ShowWindow(hWnd, nCmdShow);
    UpdateWindow(hWnd);
 
-   return TRUE;
+   return hWnd;
 }
 
 //
@@ -279,42 +281,52 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					DestroyWindow(hWnd);
 				}
 
-				//Write Info to file
-				fout << uniToAnsi(fullName) << std::endl;  //Writes data to file after converting from unicode to ansi so that notepad and excel can read it
-				fout << uniToAnsi(email) << std::endl;
-				fout << uniToAnsi(studentID) << std::endl;
-
-				//If projects are shown get values of check boxes
-				if(displayProjects)
+				//Data Validation
+				if(validateIDNumber(uniToAnsi(studentID)))
 				{
-					//Loop through check boxes
-					int i = 0;  //Intialize loop control variable
-					while(chBox[i] != NULL)  
+
+					//Write Info to file
+					fout << uniToAnsi(fullName) << std::endl;  //Writes data to file after converting from unicode to ansi so that notepad and excel can read it
+					fout << uniToAnsi(email) << std::endl;
+					fout << uniToAnsi(studentID) << std::endl;
+
+					//If projects are shown get values of check boxes
+					if(displayProjects)
 					{
-						if(IsDlgButtonChecked(hWnd, IDC_CHECKBOX + i) == BST_CHECKED)  //Checks if checkbox is checked if checked do {}
+						//Loop through check boxes
+						int i = 0;  //Intialize loop control variable
+						while(chBox[i] != NULL)  
 						{
-							fout << projectTitle[i] << std::endl;
-						}
+							if(IsDlgButtonChecked(hWnd, IDC_CHECKBOX + i) == BST_CHECKED)  //Checks if checkbox is checked if checked do {}
+							{
+								fout << projectTitle[i] << std::endl;
+							}
 						
-						//Clear checkbox
-						CheckDlgButton(hWnd, IDC_CHECKBOX + i, BST_UNCHECKED);  //Unchecks checkbox
+							//Clear checkbox
+							CheckDlgButton(hWnd, IDC_CHECKBOX + i, BST_UNCHECKED);  //Unchecks checkbox
 
-						i++;  //Increment loop control variable
-					}//End Loop
+							i++;  //Increment loop control variable
+						}//End Loop
 
-					fout << "----------" << std::endl;          //Marks end of projects list
+					}//End projects IF
 
-				}//End projects IF
+					fout << "----------" << std::endl;          //Marks end of users data
 
-				//Clear Controls     //Prep for next entry  //Hide sensitive data
-				SetDlgItemText(hWnd, IDC_FULL_NAME, L"");
-				SetDlgItemText(hWnd, IDC_EMAIL_ADDRESS, L"");
-				SetDlgItemText(hWnd, IDC_STUDENT_ID, L"");
+					//Clear Controls     //Prep for next entry  //Hide sensitive data
+					SetDlgItemText(hWnd, IDC_FULL_NAME, L"");
+					SetDlgItemText(hWnd, IDC_EMAIL_ADDRESS, L"");
+					SetDlgItemText(hWnd, IDC_STUDENT_ID, L"");
 
-				//Clear Variables   //Prevents multiple duplicate submissions
-				wcscpy(fullName, L"");
-				wcscpy(email, L"");
-				wcscpy(studentID, L"");
+					//Clear Variables   //Prevents multiple duplicate submissions
+					wcscpy(fullName, L"");
+					wcscpy(email, L"");
+					wcscpy(studentID, L"");
+				}
+				else
+				{
+					idError();
+					break;
+				}//End Validation
 
 			}
 			submitCounter++;
@@ -475,7 +487,7 @@ void createFirstPage(HWND hWnd)  //Creates admin/officer page
 	box[2] = CreateWindowEx(NULL, L"EDIT", NULL, WS_VISIBLE|WS_CHILD|WS_BORDER|WS_TABSTOP|WS_HSCROLL|ES_AUTOHSCROLL, 125, (10 + distanceBetweenControlls * 1), 150, 37, hWnd, (HMENU)IDC_HOURS, hInst, NULL);   //TextBox2
 	box[3] = CreateWindowEx(NULL, L"Static", L"Hours", WS_VISIBLE|WS_CHILD|WS_BORDER, 25, (10 + distanceBetweenControlls * 1), 100, 20, hWnd, NULL, hInst, NULL);   //Label2
 	//Description Row
-	box[4] = CreateWindowEx(NULL, L"EDIT", NULL, WS_VISIBLE|WS_CHILD|WS_BORDER|WS_VSCROLL|WS_HSCROLL|ES_MULTILINE|ES_AUTOHSCROLL|ES_AUTOVSCROLL|WS_TABSTOP, 125, (10 + distanceBetweenControlls * 2), 230, 100, hWnd, (HMENU)IDC_DESCRIPTION, hInst, NULL);   //TextBox3
+	box[4] = CreateWindowEx(NULL, L"EDIT", NULL, WS_VISIBLE|WS_CHILD|WS_BORDER|WS_VSCROLL|WS_HSCROLL|ES_MULTILINE|ES_AUTOHSCROLL|ES_AUTOVSCROLL|WS_TABSTOP|ES_WANTRETURN, 125, (10 + distanceBetweenControlls * 2), 230, 100, hWnd, (HMENU)IDC_DESCRIPTION, hInst, NULL);   //TextBox3
 	box[5] = CreateWindowEx(NULL, L"Static", L"Description", WS_VISIBLE|WS_CHILD|WS_BORDER, 25, (10 + distanceBetweenControlls * 2), 100, 20, hWnd, NULL, hInst, NULL);   //Label3
 	
 	//Submit Button
@@ -495,7 +507,7 @@ void createSecondPage(HWND hWnd)  //Creates sign in page
 	box[3] = CreateWindowEx(NULL, L"Static", L"Email Address", WS_VISIBLE|WS_CHILD|WS_BORDER, 15, (10 + distanceBetweenControlls * 1), 110, 20, hWnd, NULL, hInst, NULL);   //Label5
 	//Student ID # Row
 	box[4] = CreateWindowEx(NULL, L"EDIT", NULL, WS_VISIBLE|WS_CHILD|WS_BORDER|WS_TABSTOP|WS_HSCROLL|ES_AUTOHSCROLL, 125, (10 + distanceBetweenControlls * 2), 150, 37, hWnd, (HMENU)IDC_STUDENT_ID, hInst, NULL);   //TextBox6
-	box[5] = CreateWindowEx(NULL, L"Static", L"CPCC Student ID", WS_VISIBLE|WS_CHILD|WS_BORDER, 15, (10 + distanceBetweenControlls * 2), 110, 20, hWnd, NULL, hInst, NULL);   //Label6
+	box[5] = CreateWindowEx(NULL, L"Static", L"CPCC Student ID #", WS_VISIBLE|WS_CHILD|WS_BORDER, 15, (10 + distanceBetweenControlls * 2), 110, 20, hWnd, NULL, hInst, NULL);   //Label6
 
 	//Project Textboxs and labels
 	if(displayProjects)
@@ -510,13 +522,13 @@ void createSecondPage(HWND hWnd)  //Creates sign in page
 			std::getline(fin, projectTitle[i]);
 			
 			//Create check box with name from file
-			chBox[i] = CreateWindowEx(NULL, L"button", ansiToUni(projectTitle[i]) , WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX, 15, (start + add * i), 110, 40, hWnd, (HMENU)(IDC_CHECKBOX + i), hInst, NULL);
+			chBox[i] = CreateWindowEx(NULL, L"button", ansiToUni(projectTitle[i]) , WS_CHILD|WS_VISIBLE|BS_AUTOCHECKBOX|WS_TABSTOP, 15, (start + add * i), 110, 40, hWnd, (HMENU)(IDC_CHECKBOX + i), hInst, NULL);
 		}
 
 	}
 
 	//Submit Button
-	box[6] = CreateWindowEx(NULL, L"Button", L"Submit", WS_VISIBLE|WS_CHILD|WS_BORDER|BS_DEFPUSHBUTTON|WS_TABSTOP, 125, 261, 90, 35, hWnd, (HMENU)IDC_SUBMIT_BUTTON, hInst, NULL);      //Button1
+	box[6] = CreateWindowEx(NULL, L"Button", L"Submit", WS_VISIBLE|WS_CHILD|WS_BORDER|BS_DEFPUSHBUTTON|WS_TABSTOP, 185, 261, 90, 35, hWnd, (HMENU)IDC_SUBMIT_BUTTON, hInst, NULL);      //Button1
 }
 
 void destroyPage()  //Destroys a page 
@@ -598,4 +610,21 @@ std::string wordToString(WORD temp)  //Converts from the win 32 data type WORD t
 	std::string convertToString = std::to_string(convertToInt);  //Convert int to std::string
 
 	return convertToString;
+}
+
+bool validateIDNumber(std::string id)
+{
+	//Create a regular expression to validate Student ID number
+	static std::regex regularExpression("[0-9]*");  //Declared as static because regex objects are compiled at runtime //Prevents slowdown of function
+
+	//regex_search returns true if it finds a match for the expression in the string/c-string
+	return std::regex_search(id, regularExpression);
+}
+
+void idError()   //Displays error message
+{
+	::MessageBox(NULL, 
+				 _T("You must enter your student ID number \nNot your username"),  //Help Instructions
+				 _T("Error: Student ID Number"),				//Title
+				 MB_OK);							//Button type
 }

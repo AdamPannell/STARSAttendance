@@ -43,8 +43,6 @@ wchar_t*			ansiToUni(std::string);				//Converts string objects to uncode c-stri
 void				instructMe();
 std::string			wordToString(WORD);
 std::string			getDate();
-bool				validateIDNumber(std::string);
-void				idError();
 
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -281,52 +279,42 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					DestroyWindow(hWnd);
 				}
 
-				//Data Validation
-				if(validateIDNumber(uniToAnsi(studentID)))
+				//Write Info to file
+				fout << uniToAnsi(fullName) << std::endl;  //Writes data to file after converting from unicode to ansi so that notepad and excel can read it
+				fout << uniToAnsi(email) << std::endl;
+				fout << uniToAnsi(studentID) << std::endl;
+
+				//If projects are shown get values of check boxes
+				if(displayProjects)
 				{
-
-					//Write Info to file
-					fout << uniToAnsi(fullName) << std::endl;  //Writes data to file after converting from unicode to ansi so that notepad and excel can read it
-					fout << uniToAnsi(email) << std::endl;
-					fout << uniToAnsi(studentID) << std::endl;
-
-					//If projects are shown get values of check boxes
-					if(displayProjects)
+					//Loop through check boxes
+					int i = 0;  //Intialize loop control variable
+					while(chBox[i] != NULL)  
 					{
-						//Loop through check boxes
-						int i = 0;  //Intialize loop control variable
-						while(chBox[i] != NULL)  
+						if(IsDlgButtonChecked(hWnd, IDC_CHECKBOX + i) == BST_CHECKED)  //Checks if checkbox is checked if checked do {}
 						{
-							if(IsDlgButtonChecked(hWnd, IDC_CHECKBOX + i) == BST_CHECKED)  //Checks if checkbox is checked if checked do {}
-							{
-								fout << projectTitle[i] << std::endl;
-							}
+							fout << projectTitle[i] << std::endl;
+						}
 						
-							//Clear checkbox
-							CheckDlgButton(hWnd, IDC_CHECKBOX + i, BST_UNCHECKED);  //Unchecks checkbox
+						//Clear checkbox
+						CheckDlgButton(hWnd, IDC_CHECKBOX + i, BST_UNCHECKED);  //Unchecks checkbox
 
-							i++;  //Increment loop control variable
-						}//End Loop
+						i++;  //Increment loop control variable
+					}//End Loop
 
-					}//End projects IF
+				}//End projects IF
 
-					fout << "----------" << std::endl;          //Marks end of users data
+				fout << "----------" << std::endl;          //Marks end of users data
 
-					//Clear Controls     //Prep for next entry  //Hide sensitive data
-					SetDlgItemText(hWnd, IDC_FULL_NAME, L"");
-					SetDlgItemText(hWnd, IDC_EMAIL_ADDRESS, L"");
-					SetDlgItemText(hWnd, IDC_STUDENT_ID, L"");
+				//Clear Controls     //Prep for next entry  //Hide sensitive data
+				SetDlgItemText(hWnd, IDC_FULL_NAME, L"");
+				SetDlgItemText(hWnd, IDC_EMAIL_ADDRESS, L"");
+				SetDlgItemText(hWnd, IDC_STUDENT_ID, L"");
 
-					//Clear Variables   //Prevents multiple duplicate submissions
-					wcscpy(fullName, L"");
-					wcscpy(email, L"");
-					wcscpy(studentID, L"");
-				}
-				else
-				{
-					idError();
-					break;
-				}//End Validation
+				//Clear Variables   //Prevents multiple duplicate submissions
+				wcscpy(fullName, L"");
+				wcscpy(email, L"");
+				wcscpy(studentID, L"");
 
 			}
 			submitCounter++;
@@ -506,7 +494,7 @@ void createSecondPage(HWND hWnd)  //Creates sign in page
 	box[2] = CreateWindowEx(NULL, L"EDIT", NULL, WS_VISIBLE|WS_CHILD|WS_BORDER|WS_TABSTOP|WS_HSCROLL|ES_AUTOHSCROLL, 125, (10 + distanceBetweenControlls * 1), 150, 37, hWnd, (HMENU)IDC_EMAIL_ADDRESS, hInst, NULL);   //TextBox5
 	box[3] = CreateWindowEx(NULL, L"Static", L"Email Address", WS_VISIBLE|WS_CHILD|WS_BORDER, 15, (10 + distanceBetweenControlls * 1), 110, 20, hWnd, NULL, hInst, NULL);   //Label5
 	//Student ID # Row
-	box[4] = CreateWindowEx(NULL, L"EDIT", NULL, WS_VISIBLE|WS_CHILD|WS_BORDER|WS_TABSTOP|WS_HSCROLL|ES_AUTOHSCROLL, 125, (10 + distanceBetweenControlls * 2), 150, 37, hWnd, (HMENU)IDC_STUDENT_ID, hInst, NULL);   //TextBox6
+	box[4] = CreateWindowEx(NULL, L"EDIT", NULL, WS_VISIBLE|WS_CHILD|WS_BORDER|WS_TABSTOP|WS_HSCROLL|ES_AUTOHSCROLL|ES_NUMBER, 125, (10 + distanceBetweenControlls * 2), 150, 37, hWnd, (HMENU)IDC_STUDENT_ID, hInst, NULL);   //TextBox6
 	box[5] = CreateWindowEx(NULL, L"Static", L"CPCC Student ID #", WS_VISIBLE|WS_CHILD|WS_BORDER, 15, (10 + distanceBetweenControlls * 2), 110, 20, hWnd, NULL, hInst, NULL);   //Label6
 
 	//Project Textboxs and labels
@@ -518,7 +506,7 @@ void createSecondPage(HWND hWnd)  //Creates sign in page
 		fin.open(projectFileName);  //Open file
 		for(int i = 0; !fin.eof(); i++)
 		{
-			
+			//Read title of project and storin an array
 			std::getline(fin, projectTitle[i]);
 			
 			//Create check box with name from file
@@ -574,7 +562,7 @@ wchar_t* ansiToUni(std::string stringToConvert) //Converts string objects to unc
 	unicodeString = NULL; //Assign unicodeString to NULL to prevent memory accses errors
 
 	//Return temporary
-	return temporary;*/
+	return temporary;*/ //Works on debug mode only
 
 	return unicodeString; //Creates memory leak need to fix
 }
@@ -582,7 +570,7 @@ wchar_t* ansiToUni(std::string stringToConvert) //Converts string objects to unc
 void instructMe()   //Displays instructions from help menu
 {
 	::MessageBox(NULL, 
-				 _T("Fill in the data. \nEnter your name how you want it in our records and communications with you.\nStudent ID # is requierd for insurance reasons."),  //Help Instructions
+				 _T("Fill in the data. \nEnter your name how you want it in our records and communications with you.\nStudent ID # is requierd for CPCC Students for insurance reasons."),  //Help Instructions
 				 _T("Instructions"),				//Title
 				 MB_OK);							//Button type
 }
@@ -610,21 +598,4 @@ std::string wordToString(WORD temp)  //Converts from the win 32 data type WORD t
 	std::string convertToString = std::to_string(convertToInt);  //Convert int to std::string
 
 	return convertToString;
-}
-
-bool validateIDNumber(std::string id)
-{
-	//Create a regular expression to validate Student ID number
-	static std::regex regularExpression("[0-9]*");  //Declared as static because regex objects are compiled at runtime //Prevents slowdown of function
-
-	//regex_search returns true if it finds a match for the expression in the string/c-string
-	return std::regex_search(id, regularExpression);
-}
-
-void idError()   //Displays error message
-{
-	::MessageBox(NULL, 
-				 _T("You must enter your student ID number \nNot your username"),  //Help Instructions
-				 _T("Error: Student ID Number"),				//Title
-				 MB_OK);							//Button type
 }
